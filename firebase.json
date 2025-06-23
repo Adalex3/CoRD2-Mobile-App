@@ -1,1 +1,50 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"cord2-6c88c","appId":"1:571790127747:android:235897febcb103294c61b6","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"cord2-6c88c","appId":"1:571790127747:ios:694bbb5e50643a7f4c61b6","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"cord2-6c88c","appId":"1:571790127747:ios:694bbb5e50643a7f4c61b6","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"cord2-6c88c","configurations":{"android":"1:571790127747:android:235897febcb103294c61b6","ios":"1:571790127747:ios:694bbb5e50643a7f4c61b6"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "cord2-6c88c",
+          "appId": "1:571790127747:android:235897febcb103294c61b6",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "cord2-6c88c",
+          "appId": "1:571790127747:ios:694bbb5e50643a7f4c61b6",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "cord2-6c88c",
+          "appId": "1:571790127747:ios:694bbb5e50643a7f4c61b6",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "cord2-6c88c",
+          "configurations": {
+            "android": "1:571790127747:android:235897febcb103294c61b6",
+            "ios": "1:571790127747:ios:694bbb5e50643a7f4c61b6"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log"
+      ]
+    }
+  ]
+}
