@@ -2,10 +2,9 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
-// Load the secret key from functions config
-const SECRET_KEY = functions.config().api.key;
+const SECRET_KEY = "01b912290d4522301de4582bfe8b331b1cd7825a315341c562c578f87dcfc6ce";
 
-// HTTP function: returns latest doc from 'events' collection
+// v1 HTTPS function on Node 18
 exports.getLatestData = functions.https.onRequest(async (req, res) => {
   const apiKey = req.get("x-api-key");
   if (!apiKey || apiKey !== SECRET_KEY) {
@@ -13,11 +12,11 @@ exports.getLatestData = functions.https.onRequest(async (req, res) => {
   }
   try {
     const snapshot = await admin
-      .firestore()
-      .collection("events")
-      .orderBy("timestamp", "desc")
-      .limit(1)
-      .get();
+        .firestore()
+        .collection("events")
+        .orderBy("time", "desc")
+        .limit(1)
+        .get();
     const data = snapshot.docs.map((doc) => doc.data());
     res.json(data);
   } catch (err) {
