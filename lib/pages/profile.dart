@@ -412,7 +412,7 @@ class _ProfilePage extends State<ProfilePage> {
             indent: 0,
             endIndent: 0,
           ),
-          cardTheme: CardTheme(
+          cardTheme: CardThemeData(
             color: primary,
             elevation: 4,
             margin: const EdgeInsets.symmetric(horizontal: 20),
