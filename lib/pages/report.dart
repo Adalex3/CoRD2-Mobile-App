@@ -1,4 +1,5 @@
 import 'package:cord2_mobile_app/classes/analytics.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -184,46 +185,48 @@ class _ReportFormState extends State<ReportForm> {
       currentLat = position.latitude;
       currentLong = position.longitude;
       showModalBottomSheet(
-          context: context,
-          builder: (context) =>
-              chooseLocationModal(context, currentLat, currentLong));
+        context: context,
+        builder: (context) =>
+            chooseLocationModal(context, currentLat, currentLong, permResult),
+      );
     } else {
       showDialog(
-          context: context,
-          builder: (BuildContext context) => AlertDialog(
-                title: const Text('Location Access Denied'),
-                content: const Text('Please enable location access so we can'
-                    'get your current location. Otherwise you will need to find'
-                    'the location on the map from a generic location. You can '
-                    'change this later in app settings.'),
-                actions: <Widget>[
-                  TextButton(
-                      onPressed: () {
-                        //currentLat = 28.544331;
-                        //currentLong = -81.191931;
-                        showModalBottomSheet(
-                            context: context,
-                            builder: (context) => chooseLocationModal(
-                                context, 28.544331, -81.191931));
-                        Navigator.pop(context, 'Cancel');
-                      },
-                      child: const Text('Cancel')),
-                  TextButton(
-                      onPressed: () {
-                        openAppSettings();
-                        if (currentLat == 0.0 && currentLong == 0.0) {
-                          //currentLat = 28.544331;
-                          //currentLong = -81.191931;
-                          showModalBottomSheet(
-                              context: context,
-                              builder: (context) => chooseLocationModal(
-                                  context, 28.544331, -81.191931));
-                        }
-                        Navigator.pop(context, 'Ok');
-                      },
-                      child: const Text('Ok')),
-                ],
-              ));
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Location Access Denied'),
+          content: const Text('Please enable location access so we can'
+              'get your current location. Otherwise you will need to find'
+              'the location on the map from a generic location. You can '
+              'change this later in app settings.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  builder: (context) =>
+                      chooseLocationModal(context, 28.544331, -81.191931, permResult),
+                );
+                Navigator.pop(context, 'Cancel');
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                openAppSettings();
+                if (currentLat == 0.0 && currentLong == 0.0) {
+                  showModalBottomSheet(
+                    context: context,
+                    builder: (context) =>
+                        chooseLocationModal(context, 28.544331, -81.191931, permResult),
+                  );
+                }
+                Navigator.pop(context, 'Ok');
+              },
+              child: const Text('Ok'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -668,9 +671,8 @@ class _ReportFormState extends State<ReportForm> {
         ]));
   }
 
-  Widget chooseLocationModal(BuildContext context, var lat, var lng) {
-    return SingleChildScrollView(
-        child: Container(
+  Widget chooseLocationModal(BuildContext context, double lat, double lng, bool hasLocationPermission) {
+    return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: const BoxDecoration(
         color: Color(0xff060C3E),
@@ -679,58 +681,93 @@ class _ReportFormState extends State<ReportForm> {
           topRight: Radius.circular(25),
         ),
       ),
-      alignment: Alignment.center,
       child: Column(
         children: [
-          Container(
-              padding: EdgeInsets.all(15),
-              child: FloatingActionButton(
-                backgroundColor: Colors.white,
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: const Icon(Icons.close),
-              )),
-          SizedBox(
-            height: 5,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search location',
+                prefixIcon: Icon(Icons.search, color: Colors.white),
+                hintStyle: TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: Color(0xff172A5E),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: TextStyle(color: Colors.white),
+              onSubmitted: (query) async {
+                try {
+                  List<Location> results = await locationFromAddress(query);
+                  if (results.isNotEmpty) {
+                    final loc = results.first;
+                    mapController.move(LatLng(loc.latitude, loc.longitude), 15.0);
+                  }
+                } catch (e) {
+                  // optionally show error
+                }
+              },
+            ),
           ),
-          Text('Pick a location from the map',
-              style: GoogleFonts.jost(
-                  textStyle: const TextStyle(
-                      fontSize: 25,
-                      fontWeight: FontWeight.normal,
-                      color: Colors.white))),
-          SizedBox(height: 15),
-          Container(
-            height: MediaQuery.of(context).size.height * 0.4,
-            width: MediaQuery.of(context).size.width * 0.8,
-            child: FlutterMap(
-              mapController: mapController,
-              options: MapOptions(
-                  initialCenter: LatLng(lat, lng),
-                  initialZoom: 17.0,
-                  onTap: (tapPosition, point) => {
-                        print(point.toString()),
-                        // create a chooseLat/lng and have setstate set them here
-                        // otherwise use user's current location?
-                        setState(() {
-                          chooseLat = point.latitude;
-                          print('CHOSEN LAT: ${chooseLat}');
-                          chooseLng = point.longitude;
-                          print('CHOSEN LNG: ${chooseLng}');
-                          Navigator.pop(context);
-                        })
-                      }),
+          Expanded(
+            child: Stack(
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                FlutterMap(
+                  mapController: mapController,
+                  options: MapOptions(
+                    center: LatLng(lat, lng),
+                    zoom: 15.0,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    ),
+                  ],
+                ),
+                Center(
+                  child: Icon(Icons.location_pin, size: 50, color: Colors.redAccent),
+                ),
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: IconButton(
+                    icon: Icon(Icons.my_location),
+                    color: hasLocationPermission ? Colors.black : Colors.grey,
+                    onPressed: hasLocationPermission
+                        ? () async {
+                            final pos = await Geolocator.getCurrentPosition();
+                            mapController.move(LatLng(pos.latitude, pos.longitude), 17.0);
+                          }
+                        : null,
+                  ),
                 ),
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: ElevatedButton(
+              onPressed: () {
+                final center = mapController.center;
+                setState(() {
+                  chooseLat = center.latitude;
+                  chooseLng = center.longitude;
+                  print("chooseLat: ${chooseLat})");
+                  print("chooseLong: ${chooseLng})");
+                });
+                Navigator.pop(context);
+              },
+              child: Text('Save Location'),
+              style: ButtonStyle(
+                minimumSize: MaterialStateProperty.all(Size(double.infinity, 48)),
+              ),
+            ),
+          ),
         ],
       ),
-    ));
+    );
   }
 
   Future<String?> getImageURL() async {
