@@ -190,39 +190,39 @@ class _ReportFormState extends State<ReportForm> {
             chooseLocationModal(context, currentLat, currentLong, permResult),
       );
     } else {
+      final rootContext = context;
       showDialog(
-        context: context,
-        builder: (BuildContext context) => AlertDialog(
+        context: rootContext,
+        builder: (BuildContext dialogContext) => AlertDialog(
           title: const Text('Location Access Denied'),
-          content: const Text('Please enable location access so we can'
-              'get your current location. Otherwise you will need to find'
+          content: const Text('Please enable location access so we can '
+              'get your current location. Otherwise you will need to find '
               'the location on the map from a generic location. You can '
               'change this later in app settings.'),
           actions: <Widget>[
             TextButton(
               onPressed: () {
+                Navigator.pop(dialogContext);
                 showModalBottomSheet(
-                  context: context,
-                  builder: (context) =>
-                      chooseLocationModal(context, 28.544331, -81.191931, permResult),
+                  context: rootContext,
+                  // default location is the center of UCF
+                  builder: (_) => chooseLocationModal(rootContext, 28.602979238181945, -81.20011495430661, permResult),
                 );
-                Navigator.pop(context, 'Cancel');
               },
-              child: const Text('Cancel'),
+              child: const Text('Ignore'),
             ),
             TextButton(
               onPressed: () {
+                Navigator.pop(dialogContext);
                 openAppSettings();
                 if (currentLat == 0.0 && currentLong == 0.0) {
                   showModalBottomSheet(
-                    context: context,
-                    builder: (context) =>
-                        chooseLocationModal(context, 28.544331, -81.191931, permResult),
+                    context: rootContext,
+                    builder: (_) => chooseLocationModal(rootContext, 28.602979238181945, -81.20011495430661, permResult),
                   );
                 }
-                Navigator.pop(context, 'Ok');
               },
-              child: const Text('Ok'),
+              child: const Text('Settings'),
             ),
           ],
         ),
