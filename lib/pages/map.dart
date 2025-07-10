@@ -1061,7 +1061,16 @@ class DisplayMapPageState extends State<DisplayMap> {
   }
   // Hurricane selection dialog (fetchHurdatStormList and fetchHurdatStormPolylines must be implemented elsewhere)
   Future<void> _showHurricaneSelectionDialog() async {
+    // Show loading indicator while fetching storm list
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
     final List<Map<String, dynamic>> storms = await fetchHurdatStormList(); // List<Map<String,dynamic>> with keys 'id','name', etc.
+    // Dismiss loading indicator
+    Navigator.of(context).pop();
+
     await showDialog(
       context: context,
       builder: (context) {
@@ -1108,8 +1117,14 @@ class DisplayMapPageState extends State<DisplayMap> {
         );
       },
     );
-    // After dialog, fetch polylines for selected storms:
+    // Show loading indicator while fetching hurricane tracks
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
     hurricanePolylines = await fetchHurdatStormPolylines(selectedHurricanes);
+    Navigator.of(context).pop();
     setState(() {
       showHurricanes = selectedHurricanes.isNotEmpty;
     });
