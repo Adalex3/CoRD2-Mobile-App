@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cord2_mobile_app/classes/analytics.dart';
@@ -7,10 +8,11 @@ import 'package:cord2_mobile_app/pages/search.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map/flutter_map.dart'; // for Polyline & PolylineLayer
 import 'package:flutter_map_geojson/flutter_map_geojson.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:uuid/uuid.dart';
@@ -46,11 +48,16 @@ class DisplayMapPageState extends State<DisplayMap> {
   CollectionReference users = FirebaseFirestore.instance.collection('users');
   String permType = '';
 
+  static const String _hurdatUrl = 'https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2024-040425.txt';
+
   bool showReports = true;
   bool showSchools = true;
   bool showSunrail = false;
   bool showTransit = false;
   bool showCountyLine = false;
+  bool showHurricanes = false;
+  List<String> selectedHurricanes = [];
+  List<Polyline> hurricanePolylines = [];
 
   final Location _locationController = Location();
   StreamSubscription<LocationData>? locationSubscription;
@@ -770,6 +777,33 @@ class DisplayMapPageState extends State<DisplayMap> {
                             ),
                             const SizedBox(height: 20),
                             InkWell(
+                              onTap: () async {
+                                await _showHurricaneSelectionDialog();
+                                setFilterState(() {
+                                  showHurricanes = selectedHurricanes.isNotEmpty;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      style: GoogleFonts.jost(
+                                        textStyle: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.normal,
+                                          color: Color(0xff060C3E),
+                                        ),
+                                      ),
+                                      "Hurricanes",
+                                    ),
+                                    showHurricanes ? const Icon(Icons.check) : Container(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            InkWell(
                               onTap: () {
                                 setState(() {
                                   showCountyLine = !showCountyLine;
@@ -942,6 +976,11 @@ class DisplayMapPageState extends State<DisplayMap> {
                 polygons: counties_polygons,
               )
             : Container(),
+        showHurricanes
+            ? PolylineLayer(
+                polylines: hurricanePolylines,
+              )
+            : Container(),
       ],
     );
   }
@@ -1019,5 +1058,150 @@ class DisplayMapPageState extends State<DisplayMap> {
                         decoration: TextDecoration.none,
                       )));
             }));
+  }
+  // Hurricane selection dialog (fetchHurdatStormList and fetchHurdatStormPolylines must be implemented elsewhere)
+  Future<void> _showHurricaneSelectionDialog() async {
+    // TODO: implement fetchHurdatStormList() to get storm IDs/names
+    final List<Map<String, dynamic>> storms = await fetchHurdatStormList(); // List<Map<String,dynamic>> with keys 'id','name', etc.
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select Hurricanes'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              itemCount: storms.length,
+              itemBuilder: (context, index) {
+                final storm = storms[index];
+                final id = storm['id']!;
+                final name = storm['name']!;
+                final selected = selectedHurricanes.contains(id);
+                return CheckboxListTile(
+                  title: Text(name),
+                  subtitle: Text('${storm['startDate']} – ${storm['endDate']}',
+                      style: const TextStyle(fontSize: 12)),
+                  value: selected,
+                  onChanged: (checked) {
+                    setState(() {
+                      if (checked == true) {
+                        selectedHurricanes.add(id);
+                      } else {
+                        selectedHurricanes.remove(id);
+                      }
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
+    // After dialog, fetch polylines for selected storms:
+    hurricanePolylines = await fetchHurdatStormPolylines(selectedHurricanes);
+    setState(() {});
+  }
+  Future<List<Map<String, dynamic>>> fetchHurdatStormList() async {
+    final url = _hurdatUrl;
+    debugPrint('Fetching hurricane list from $url');
+    final response = await http.get(Uri.parse(url));
+    debugPrint('HURDAT2 list response status: ${response.statusCode}');
+    final snippet = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+    debugPrint('HURDAT2 list response body snippet: $snippet');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load HURDAT2 list: HTTP ${response.statusCode}');
+    }
+    final lines = response.body.split('\n');
+    final storms = <Map<String, dynamic>>[];
+    for (var i = 0; i < lines.length; i++) {
+      final header = lines[i];
+      if (header.trim().isEmpty) continue;
+      final headerParts = header.split(',');
+      if (headerParts.length >= 3 && RegExp(r'^[A-Z]{2}\d{6}$').hasMatch(headerParts[0].trim())) {
+        final id = headerParts[0].trim();
+        final stormName = headerParts[1].trim();
+        if (stormName.toUpperCase() == 'UNNAMED') continue;
+        final obsCount = int.tryParse(headerParts[2].trim()) ?? 0;
+        if (obsCount <= 0 || i + obsCount >= lines.length) {
+          continue;
+        }
+        // Parse first observation
+        final firstObs = lines[i + 1].split(',');
+        final startDateRaw = firstObs[0].trim();
+        final startTimeRaw = firstObs[1].trim();
+        final startDT = DateTime.parse(
+            '${startDateRaw.substring(0,4)}-${startDateRaw.substring(4,6)}-${startDateRaw.substring(6,8)}T${startTimeRaw.substring(0,2)}:${startTimeRaw.substring(2,4)}:00Z')
+            .toLocal();
+        // Parse last observation
+        final lastIndex = i + obsCount;
+        final lastObs = lines[lastIndex].split(',');
+        final endDateRaw = lastObs[0].trim();
+        final endTimeRaw = lastObs[1].trim();
+        final endDT = DateTime.parse(
+            '${endDateRaw.substring(0,4)}-${endDateRaw.substring(4,6)}-${endDateRaw.substring(6,8)}T${endTimeRaw.substring(0,2)}:${endTimeRaw.substring(2,4)}:00Z')
+            .toLocal();
+        // Format for display
+        final startDisplay = DateFormat.yMMMd().format(startDT);
+        final endDisplay = DateFormat.yMMMd().format(endDT);
+        storms.add({
+          'id': id,
+          'name': stormName,
+          'startDate': startDisplay,
+          'endDate': endDisplay,
+          'endDateDT': endDT,
+        });
+        // Skip observation lines
+        i += obsCount;
+      }
+    }
+    // Sort newest (most recent endDT) first
+    storms.sort((a, b) => (b['endDateDT'] as DateTime).compareTo(a['endDateDT'] as DateTime));
+    return storms;
+  }
+
+  Future<List<Polyline>> fetchHurdatStormPolylines(List<String> stormIds) async {
+    final url = _hurdatUrl;
+    debugPrint('Fetching hurricane tracks from $url for storms: $stormIds');
+    final response = await http.get(Uri.parse(url));
+    debugPrint('HURDAT2 tracks response status: ${response.statusCode}');
+    final polySnippet = response.body.length > 200 ? response.body.substring(0, 200) : response.body;
+    debugPrint('HURDAT2 tracks response body snippet: $polySnippet');
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load HURDAT2 tracks: HTTP ${response.statusCode}');
+    }
+    final lines = response.body.split('\n');
+    final polylines = <Polyline>[];
+    for (var i = 0; i < lines.length; i++) {
+      final header = lines[i];
+      if (header.trim().isEmpty) continue;
+      final headerParts = header.split(',');
+      final id = headerParts[0].trim();
+      if (stormIds.contains(id) && headerParts.length >= 3) {
+        final obsCount = int.tryParse(headerParts[2].trim()) ?? 0;
+        final points = <LatLng>[];
+        for (var j = i + 1; j <= i + obsCount && j < lines.length; j++) {
+          final obsParts = lines[j].split(',');
+          if (obsParts.length > 5) {
+            final latStr = obsParts[4].trim();
+            final lonStr = obsParts[5].trim();
+            double lat = double.tryParse(latStr.substring(0, latStr.length - 1)) ?? 0;
+            if (latStr.endsWith('S')) lat = -lat;
+            double lon = double.tryParse(lonStr.substring(0, lonStr.length - 1)) ?? 0;
+            if (lonStr.endsWith('W')) lon = -lon;
+            points.add(LatLng(lat, lon));
+          }
+        }
+        polylines.add(Polyline(points: points, strokeWidth: 3.0, color: Colors.blue));
+        i += obsCount;
+      }
+    }
+    return polylines;
   }
 }
