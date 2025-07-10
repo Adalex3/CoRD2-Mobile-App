@@ -1061,52 +1061,58 @@ class DisplayMapPageState extends State<DisplayMap> {
   }
   // Hurricane selection dialog (fetchHurdatStormList and fetchHurdatStormPolylines must be implemented elsewhere)
   Future<void> _showHurricaneSelectionDialog() async {
-    // TODO: implement fetchHurdatStormList() to get storm IDs/names
     final List<Map<String, dynamic>> storms = await fetchHurdatStormList(); // List<Map<String,dynamic>> with keys 'id','name', etc.
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Select Hurricanes'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              itemCount: storms.length,
-              itemBuilder: (context, index) {
-                final storm = storms[index];
-                final id = storm['id']!;
-                final name = storm['name']!;
-                final selected = selectedHurricanes.contains(id);
-                return CheckboxListTile(
-                  title: Text(name),
-                  subtitle: Text('${storm['startDate']} – ${storm['endDate']}',
-                      style: const TextStyle(fontSize: 12)),
-                  value: selected,
-                  onChanged: (checked) {
-                    setState(() {
-                      if (checked == true) {
-                        selectedHurricanes.add(id);
-                      } else {
-                        selectedHurricanes.remove(id);
-                      }
-                    });
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            return AlertDialog(
+              title: const Text('Select Hurricanes'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  itemCount: storms.length,
+                  itemBuilder: (context, index) {
+                    final storm = storms[index];
+                    final id = storm['id']!;
+                    final name = storm['name']!;
+                    final startDate = storm['startDate'];
+                    final endDate = storm['endDate'];
+                    final selected = selectedHurricanes.contains(id);
+                    return CheckboxListTile(
+                      title: Text(name),
+                      subtitle: Text('$startDate – $endDate', style: const TextStyle(fontSize: 12)),
+                      value: selected,
+                      onChanged: (checked) {
+                        dialogSetState(() {
+                          if (checked == true) {
+                            selectedHurricanes.add(id);
+                          } else {
+                            selectedHurricanes.remove(id);
+                          }
+                        });
+                      },
+                    );
                   },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
-            ),
-          ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Done'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
     // After dialog, fetch polylines for selected storms:
     hurricanePolylines = await fetchHurdatStormPolylines(selectedHurricanes);
-    setState(() {});
+    setState(() {
+      showHurricanes = selectedHurricanes.isNotEmpty;
+    });
   }
   Future<List<Map<String, dynamic>>> fetchHurdatStormList() async {
     final url = _hurdatUrl;
