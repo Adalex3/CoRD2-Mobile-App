@@ -14,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import 'firebase_options.dart';
 
 void main() async {
@@ -127,6 +129,16 @@ class _HomePageState extends State<HomePage> {
             _buildDrawerItem("Report"),
             _buildDrawerItem("Chat"),
             _buildDrawerItem("Profile"),
+            ListTile(
+              title: Text('UCF Digital Twin',
+                  style: GoogleFonts.jost(
+                    textStyle: TextStyle(color: Colors.white, height: 1.0, fontSize: 20),
+                  )),
+              onTap: () {
+                Navigator.pop(context);
+                _launchURL('https://cesium-app.onrender.com/login.html#');
+              },
+            ),
             const Divider(),
             ListTile(
               title: Text('Log Out',
@@ -190,5 +202,14 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       currentPage = pageName;
     });
+  }
+
+  Future<void> _launchURL(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.platformDefault);
+    } else {
+      throw 'Could not launch $url';
+    }
   }
 }
