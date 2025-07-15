@@ -723,6 +723,7 @@ class _ReportFormState extends State<ReportForm> {
                   children: [
                     TileLayer(
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: "com.app.demo",
                     ),
                   ],
                 ),
