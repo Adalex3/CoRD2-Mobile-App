@@ -42,6 +42,18 @@
 	<string>571790127747-25f4gtg81jc0j1tsfejuvknad7pon6bo.apps.googleusercontent.com</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Used to help provide audio files for user to apply</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Used to help add photos to reports</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Location used for user to self-locate on map for responders to view user locations</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location used for user to self-locate on map for responders to view user locations</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Used to help add photos to reports</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Used to help add photos to reports</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -61,17 +73,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Location used for user to self-locate on map for responders to view user locations</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Location used for user to self-locate on map for responders to view user locations</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Used to help add photos to reports</string>
-	<key>NSPhotoLibraryUsageDescription	</key>
-	<string>Used to help add photos to reports</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Used to help add photos to reports</string>
-	<key>NSAppleMusicUsageDescription</key>
-	<string>Used to help provide audio files for user to apply</string>
 </dict>
 </plist>
