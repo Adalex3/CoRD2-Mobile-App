@@ -43,6 +43,13 @@ class _ReportFormState extends State<ReportForm> {
   void initState() {
     mapController = MapController();
     super.initState();
+    // Request camera and gallery permissions
+    Permission.camera.request();
+    if (Platform.isIOS) {
+      Permission.photos.request();
+    } else {
+      Permission.storage.request();
+    }
     print(currentUserId);
     analytics.logScreenBrowsing("Report Form");
   }
@@ -80,101 +87,117 @@ class _ReportFormState extends State<ReportForm> {
     return false;
   }
 
-  Future<void> pickImage() async {
-    ImagePicker picker = ImagePicker();
-    bool permResult = await checkPerms('camera');
-    XFile? file;
+  Future<bool> checkGalleryPermission() async {
+    // iOS needs photos, Android needs storage
+    final status = Platform.isIOS
+      ? await Permission.photos.request()
+      : await Permission.storage.request();
 
-    if (permResult == true) {
-      file = await picker.pickImage(
-        source: ImageSource.camera,
-        maxHeight: 640,
-        maxWidth: 640,
-        imageQuality: 50,
+    if (status.isGranted) return true;
+
+    // user denied or permanently denied
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Gallery Access Denied'),
+        content: Text(
+          'Please enable gallery access in your settings to choose photos.'
+        ),
+        actions: [
+          TextButton(
+            child: Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
+          ),
+          TextButton(
+            child: Text('Settings'),
+            onPressed: () {
+              openAppSettings();
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+    return false;
+  }
+
+  Future<void> pickImage(ImageSource source) async {
+  final picker = ImagePicker();
+  // no need to check perms for gallery; only camera
+  if (source == ImageSource.camera) {
+    final granted = await Permission.camera.request();
+    if (!granted.isGranted) {
+      return showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text('Camera Access Denied'),
+          content: Text('Enable camera in settings to take a photo.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+            TextButton(onPressed: () { openAppSettings(); Navigator.pop(context); }, child: Text('Settings')),
+          ],
+        ),
       );
-      showDialog(
-          context: context,
-          builder: (BuildContext context) => AlertDialog(
-                title: TextFormField(
-                    decoration: InputDecoration(
-                        labelText: 'Image Selected', // Your text
-                        labelStyle: GoogleFonts.jost(
-                          // Applying Google Font style
-                          textStyle: TextStyle(
-                            fontSize: 20,
-                            color: Colors.black,
-                          ),
-                        ),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(
-                              color: Color(0xff060C3E),
-                              width: 2.0), // Customize underline color
-                        ))),
-                elevation: 10,
-                content: SizedBox(
-                  width: 50,
-                  child: Text("You have successfully selected an image.",
-                      style: GoogleFonts.jost(
-                          textStyle: TextStyle(
-                        fontSize:
-                            16, // Set your desired font size for input text
-                        color: Colors
-                            .black, // Set your desired color for input text
-                      ))),
-                ),
-                actions: [
-                  ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text("Ok",
-                          style: GoogleFonts.jost(
-                              textStyle: TextStyle(
-                            fontSize:
-                                15, // Set your desired font size for input text
-                            color: Colors
-                                .black, // Set your desired color for input text
-                          ))))
-                ],
-              ));
-    } else {
-      showDialog(
-          context: context,
-          builder: (BuildContext context) => AlertDialog(
-                title: const Text('Camera Access Denied'),
-                content: const Text('Please enable camera access in order to\n'
-                    'to submit a taken picture. '
-                    'You may change this later in the app\'s settings.'),
-                actions: <Widget>[
-                  TextButton(
-                      onPressed: () {
-                        file = null;
-                        Navigator.pop(context, 'Cancel');
-                      },
-                      child: const Text('Cancel')),
-                  TextButton(
-                      onPressed: () {
-                        openAppSettings();
-                        Navigator.pop(context, 'Ok');
-                      },
-                      child: const Text('Ok')),
-                ],
-              ));
-      if (file != null) {
-        setState(() {
-          _selectedImage = File(file!.path); // Store the selected image
-        });
-      }
-    }
-
-    //XFile? file = await picker.pickImage(source: ImageSource.camera);
-
-    if (file == null) {
-      return;
-    } else {
-      setState(() {
-        _imageFile = file;
-      });
     }
   }
+  final file = await picker.pickImage(
+    source: source,
+    maxWidth: 640,
+    maxHeight: 640,
+    imageQuality: 50,
+  );
+  if (file == null) return;
+  setState(() => _imageFile = file);
+}
+
+Future<void> pickImageFromGallery() async {
+  final picker = ImagePicker();
+
+  // ask for gallery/storage permission
+  final hasPerm = await checkGalleryPermission();
+  if (!hasPerm) return;
+
+  final file = await picker.pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 640,
+    maxHeight: 640,
+    imageQuality: 50,
+  );
+
+  if (file == null) return;
+
+  setState(() {
+    _imageFile = file;
+  });
+}
+
+void _showImageSourceDialog() {
+  showModalBottomSheet(
+    context: context,
+    builder: (ctx) => SafeArea(
+      child: Wrap(
+        children: [
+          ListTile(
+            leading: Icon(Icons.camera_alt),
+            title: Text('Take Photo'),
+            onTap: () {
+              Navigator.pop(ctx);
+              pickImage(ImageSource.camera); // the existing camera picker
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.photo_library),
+            title: Text('Choose from Gallery'),
+            onTap: () {
+              Navigator.pop(ctx);
+              pickImageFromGallery();
+            },
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Future<void> pickLocation() async {
     bool permResult = await checkPerms('location');
@@ -542,7 +565,7 @@ class _ReportFormState extends State<ReportForm> {
                               )))),
                       GestureDetector(
                         onTap: () {
-                          pickImage();
+                          _showImageSourceDialog();
                         },
                         child: Padding(
                             padding: const EdgeInsets.only(
