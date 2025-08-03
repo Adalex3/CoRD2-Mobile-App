@@ -21,6 +21,8 @@ import '../models/chat_model.dart';
 import '../models/point_data.dart';
 import 'package:location/location.dart' hide PermissionStatus;
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:convert';                           // for GeoJSON parsing
+import 'package:flutter_map_heatmap/flutter_map_heatmap.dart';
 
 class DisplayMap extends StatefulWidget {
   final bool admin;
@@ -58,6 +60,8 @@ class DisplayMapPageState extends State<DisplayMap> {
   bool showHurricanes = false;
   List<String> selectedHurricanes = [];
   List<Polyline> hurricanePolylines = [];
+  bool showHeatmap = false;
+  List<WeightedLatLng> heatmapPoints = [];
 
   final Location _locationController = Location();
   StreamSubscription<LocationData>? locationSubscription;
@@ -199,6 +203,18 @@ class DisplayMapPageState extends State<DisplayMap> {
     defaultPolygonFillColor: Colors.red.withOpacity(0.1),
     defaultCircleMarkerColor: Colors.red.withOpacity(0.25),
   );
+
+  Future<void> loadHeatmapData() async {
+    final raw = await rootBundle.loadString('assets/sample_heatmap.geojson');
+    final jsonData = json.decode(raw);
+    heatmapPoints.clear();
+    for (var f in jsonData['features']) {
+      final coords = f['geometry']['coordinates'];
+      final lat = coords[1] as double, lon = coords[0] as double;
+      final weight = (f['properties']?['value'] as num?)?.toDouble() ?? 1.0;
+      heatmapPoints.add(WeightedLatLng(LatLng(lat, lon), weight));
+    }
+  }
 
   // can filter based on criteria
   bool myFilterFunction(Map<String, dynamic> properties) {
@@ -803,6 +819,7 @@ class DisplayMapPageState extends State<DisplayMap> {
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 20),
                             InkWell(
                               onTap: () {
                                 setState(() {
@@ -838,6 +855,14 @@ class DisplayMapPageState extends State<DisplayMap> {
                                   ],
                                 ),
                               ),
+                            ),
+                            const SizedBox(height: 20),
+                            InkWell(
+                              onTap: () {
+                                setState(() => showHeatmap = !showHeatmap);
+                                setFilterState(() {});
+                              },
+                              child: _filterRow("Heatmap", showHeatmap),
                             ),
                           ],
                         )),
@@ -934,6 +959,8 @@ class DisplayMapPageState extends State<DisplayMap> {
     String geoJsonData3 = await rootBundle.loadString(paths[2]);
     String geoJsonData4 = await rootBundle.loadString(paths[3]);
 
+    await loadHeatmapData();
+
     setState(() {
       geoJsonParser.parseGeoJsonAsString(geoJsonData);
       sunrail_markers = geoJsonParser.markers;
@@ -954,8 +981,24 @@ class DisplayMapPageState extends State<DisplayMap> {
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: "com.app.demo",
+          tileProvider: NetworkTileProvider(),
+          userAgentPackageName: 'com.your.app',
+          // handle failures gracefully:
+          errorTileCallback: (tile, err, stack) => debugPrint('⚠️ failed tile $tile'),
+          errorImage: const AssetImage('assets/empty_tile.png'),
+          fallbackUrl: 'https://tile.stadiamaps.com/tiles/osm/{z}/{x}/{y}.png',
         ),
+        if (showHeatmap)
+          HeatMapLayer(
+            heatMapDataSource: InMemoryHeatMapDataSource(data: heatmapPoints),
+            heatMapOptions: HeatMapOptions(
+              gradient: HeatMapOptions.defaultGradient,
+              radius: 450,
+              // blur: 15,
+              minOpacity: 1,
+            ),
+            reset: null,
+          ),
         // replaced with MarkerCLusterLayerWidget
         /*MarkerLayer(
             markers: _markers,
@@ -1059,6 +1102,25 @@ class DisplayMapPageState extends State<DisplayMap> {
                       )));
             }));
   }
+
+  Widget _filterRow(String label, bool active) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+            style: GoogleFonts.jost(textStyle: const TextStyle(
+              fontSize: 20,
+              color: Color(0xff060C3E),
+            )),
+          ),
+          if (active) const Icon(Icons.check),
+        ],
+      ),
+    );
+  }
+
   // Hurricane selection dialog (fetchHurdatStormList and fetchHurdatStormPolylines must be implemented elsewhere)
   Future<void> _showHurricaneSelectionDialog() async {
     // Show loading indicator while fetching storm list

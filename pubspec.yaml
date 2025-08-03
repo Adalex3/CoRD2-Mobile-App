@@ -61,6 +61,7 @@ dependencies:
   location: ^7.0.1
   geocoding: ^2.0.5
   url_launcher: ^6.3.2
+  flutter_map_heatmap: ^0.0.7
 
 dev_dependencies:
   flutter_test:
@@ -89,6 +90,7 @@ flutter:
     - assets/LOTIS_SUNRAIL.geojson
     - assets/LOTIS_TRANSIT.geojson
     - assets/geojson-fl-counties-fips.geojson
+    - assets/sample_heatmap.geojson
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
